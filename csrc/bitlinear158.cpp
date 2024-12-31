@@ -1,6 +1,9 @@
 #include <torch/extension.h>
 #include <vector>
 
+// TODO: validation check
+// TODO: regression test for backward pass
+
 #ifdef WITH_CUDA
 std::vector<torch::Tensor> bitlinear158_inference_cuda_forward(
     torch::Tensor input,
