@@ -1,3 +1,5 @@
+import os
+
 import torch
 from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension as _BuildExtension
@@ -5,8 +7,7 @@ from torch.utils.cpp_extension import CppExtension, CUDAExtension
 
 
 class BuildExtension(_BuildExtension):
-    # TODO: support editable mode
-    extensions = []
+    extensions: list[CppExtension | CUDAExtension] = []
 
     if torch.cuda.is_available():
         extensions.append(
@@ -27,6 +28,15 @@ class BuildExtension(_BuildExtension):
                 ],
             )
         )
+
+    def run(self) -> None:
+        if self.editable_mode:
+            # create directories to save ".so" files in editable mode.
+            for extension in self.extensions:
+                *pkg_names, _ = extension.name.split(".")
+                os.makedirs("/".join(pkg_names), exist_ok=True)
+
+        super().run()
 
 
 setup(
