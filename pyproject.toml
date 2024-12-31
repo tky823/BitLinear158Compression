@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+    "setuptools",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitlinear158compression"
+description = "Library for compression of BitLinear158 models."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "torch",
+]
+dynamic = [
+    "version",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "bitlinear158compression.__version__"}
+
+[tool.setuptools.packages.find]
+include = [
+    "bitlinear158compression",
+]
