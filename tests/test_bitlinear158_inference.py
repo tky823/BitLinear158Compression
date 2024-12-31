@@ -49,6 +49,7 @@ def main() -> None:
 
     for iter_idx in range(num_iter):
         input = torch.randn((batch_size, in_features))
+        input = input.to(device)
 
         with torch.inference_mode():
             start = time.perf_counter()
