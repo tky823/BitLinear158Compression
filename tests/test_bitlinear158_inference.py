@@ -1,3 +1,5 @@
+import time
+
 import torch
 
 from bitlinear158compression.bitnet import (
@@ -11,11 +13,12 @@ from bitlinear158compression.utils import compute_model_size, compute_state_dict
 def main() -> None:
     torch.manual_seed(0)
 
+    num_iter = 10000
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
     batch_size = 4
     in_features = 256
     out_features = 512
-
-    input = torch.randn((batch_size, in_features))
 
     bias = True
     weight_only_quantization = True
@@ -32,27 +35,54 @@ def main() -> None:
         training_model
     )
 
+    training_model.to(device)
+    int8_inference_model.to(device)
+    uint2_inference_model.to(device)
+
     training_model.eval()
     int8_inference_model.eval()
     uint2_inference_model.eval()
 
-    with torch.inference_mode():
-        training_output = training_model(input)
-        int8_inference_output = int8_inference_model(input)
-        uint2_inference_output = uint2_inference_model(input)
+    training_elapsed_time = 0
+    int8_inference_elapsed_time = 0
+    uint2_inference_elapsed_time = 0
 
-    assert torch.allclose(training_output, int8_inference_output)
-    assert torch.allclose(training_output, uint2_inference_output)
+    for iter_idx in range(num_iter):
+        input = torch.randn((batch_size, in_features))
 
-    print("Size of model parameters in byte:")
-    print("\tfloat32: {:8d}".format(compute_model_size(training_model)))
-    print("\t   int8: {:8d}".format(compute_model_size(int8_inference_model)))
-    print("\t  uint2: {:8d}".format(compute_model_size(uint2_inference_model)))
+        with torch.inference_mode():
+            start = time.perf_counter()
+            training_output = training_model(input)
+            end = time.perf_counter()
+            training_elapsed_time += end - start
 
-    print("Size of stored state_dict in byte:")
-    print("\tfloat32: {:8d}".format(compute_state_dict_size(training_model)))
-    print("\t   int8: {:8d}".format(compute_state_dict_size(int8_inference_model)))
-    print("\t  uint2: {:8d}".format(compute_state_dict_size(uint2_inference_model)))
+            start = time.perf_counter()
+            int8_inference_output = int8_inference_model(input)
+            end = time.perf_counter()
+            int8_inference_elapsed_time += end - start
+
+            start = time.perf_counter()
+            uint2_inference_output = uint2_inference_model(input)
+            end = time.perf_counter()
+            uint2_inference_elapsed_time += end - start
+
+        if iter_idx == 0:
+            assert torch.allclose(training_output, int8_inference_output)
+            assert torch.allclose(training_output, uint2_inference_output)
+
+            print("Size of model parameters in byte:")
+            print(f"\tfloat32: {compute_model_size(training_model):8d}")
+            print(f"\t   int8: {compute_model_size(int8_inference_model):8d}")
+            print(f"\t  uint2: {compute_model_size(uint2_inference_model):8d}")
+
+            print("Size of stored state_dict in byte:")
+            print(f"\tfloat32: {compute_state_dict_size(training_model):8d}")
+            print(f"\t   int8: {compute_state_dict_size(int8_inference_model):8d}")
+            print(f"\t  uint2: {compute_state_dict_size(uint2_inference_model):8d}")
+
+    print(training_elapsed_time)
+    print(int8_inference_elapsed_time)
+    print(uint2_inference_elapsed_time)
 
 
 if __name__ == "__main__":
