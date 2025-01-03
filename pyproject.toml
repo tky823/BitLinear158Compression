@@ -11,6 +11,7 @@ description = "Library for compression of BitLinear158 models."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "packaging",
     "torch",
     "torchao",
 ]
