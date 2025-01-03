@@ -18,3 +18,6 @@ pip install .
 ```sh
 python tests/test_bitlinear158_inference.py
 ```
+
+## NOTE
+There is room for improvement of computational speed by setting additional compling arguments in `setup.py`.
