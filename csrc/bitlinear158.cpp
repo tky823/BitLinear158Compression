@@ -40,6 +40,7 @@ std::vector<torch::Tensor> bitlinear158_inference_forward(
 {
     if (input.is_cuda())
     {
+        TORCH_CHECK(quantized_weight.is_cuda(), "Quantized weight should be on CUDA.");
 #ifdef WITH_CUDA
         return bitlinear158_inference_cuda_forward(input, quantized_weight);
 #endif
@@ -47,6 +48,8 @@ std::vector<torch::Tensor> bitlinear158_inference_forward(
     }
     else
     {
+        TORCH_CHECK(!quantized_weight.is_cuda(), "Quantized weight should NOT be on CUDA.");
+
         return bitlinear158_inference_cpu_forward(input, quantized_weight);
     }
 }
@@ -58,6 +61,7 @@ std::vector<torch::Tensor> bitlinear158_inference_backward(
 {
     if (input.is_cuda())
     {
+        TORCH_CHECK(quantized_weight.is_cuda(), "Quantized weight should be on CUDA.");
 #ifdef WITH_CUDA
         return bitlinear158_inference_cuda_backward(input, quantized_weight, grad_output);
 
@@ -66,6 +70,8 @@ std::vector<torch::Tensor> bitlinear158_inference_backward(
     }
     else
     {
+        TORCH_CHECK(!quantized_weight.is_cuda(), "Quantized weight should NOT be on CUDA.");
+
         return bitlinear158_inference_cpu_backward(input, quantized_weight, grad_output);
     }
 }
