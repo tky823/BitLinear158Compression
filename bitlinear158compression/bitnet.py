@@ -347,6 +347,68 @@ class BitLinear158CppInference(BitLinear158Inference):
         return output
 
 
+class BitLinear158CppTraining(BitLinear158Inference):
+    def __init__(
+        self,
+        weight: nn.Parameter | torch.Tensor,
+        bias: nn.Parameter | torch.Tensor | None = None,
+        bits: int = 8,
+        eps: float = 1e-5,
+        weight_only_quantization: bool = False,
+    ) -> None:
+        super().__init__()
+
+        weight = nn.Parameter(weight.data, requires_grad=True)
+
+        if bias is not None:
+            bias = nn.Parameter(bias.data, requires_grad=True)
+
+        self.register_parameter("weight", weight)
+
+        if bias is None:
+            self.register_parameter("bias", None)
+        else:
+            self.register_parameter("bias", bias)
+
+        self.out_features, self.in_features = weight.size()
+        self.bits = bits
+        self.eps = eps
+        self.weight_only_quantization = weight_only_quantization
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        """Forward pass of BitLinear158.
+
+        Args:
+            input (torch.Tensor): Tensor of shape (*batch_shape, in_features).
+
+        Returns:
+            torch.Tensor: Tensor of shape (*batch_shape, out_features).
+
+        """
+        weight = self.weight
+        bias = self.bias
+        bits = self.bits
+        eps = self.eps
+        weight_only_quantization = self.weight_only_quantization
+
+        q = 2 ** (bits - 1)
+        quantized_weight, scale = quantize_weight(weight, eps=eps)
+        abs_input = torch.abs(input)
+        gamma, _ = torch.max(abs_input, dim=-1, keepdim=True)
+        gamma = torch.clamp(gamma, min=eps)
+        quantized_input = input * q / gamma
+
+        if weight_only_quantization:
+            quantized_input = torch.clamp(quantized_input, min=-q, max=q - 1)
+        else:
+            quantized_input = round_clamp(quantized_input, min=-q, max=q - 1)
+
+        x = bitlinear158(quantized_input, quantized_weight, bias=bias)
+        output = x * (scale * gamma) / q
+
+        return output
+
+
 if version.parse(torch.__version__) > version.parse("2.4.0"):
 
     @torch.library.register_fake(
@@ -376,7 +438,7 @@ if version.parse(torch.__version__) > version.parse("2.4.0"):
         else:
             quantized_weight = quantized_weight.to(input.dtype)
 
-        (output,) = (
+        output = (
             torch.ops.bitlinear158compression.bitlinear158_inference_forward.default(
                 input, quantized_weight
             )
@@ -386,6 +448,41 @@ if version.parse(torch.__version__) > version.parse("2.4.0"):
             output = output + bias
 
         return output
+
+    def _backward(ctx, grad_output: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        input, quantized_weight = ctx.saved_tensors
+
+        grad_inputs = (
+            torch.ops.bitlinear158compression.bitlinear158_inference_backward.default(
+                input, quantized_weight, grad_output
+            )
+        )
+
+        if ctx.needs_input_grad[0]:
+            grad_input = grad_inputs[0]
+        else:
+            grad_input = None
+
+        if ctx.needs_input_grad[1]:
+            grad_quantized_weight = grad_inputs[1]
+        else:
+            grad_quantized_weight = None
+
+        return grad_input, grad_quantized_weight
+
+    def _setup_context(
+        ctx,
+        inputs: tuple[torch.Tensor, torch.Tensor],
+        output: tuple[torch.Tensor],
+    ) -> None:
+        ctx.save_for_backward(*inputs)
+
+    torch.library.register_autograd(
+        "bitlinear158compression::bitlinear158_inference_forward",
+        _backward,
+        setup_context=_setup_context,
+    )
+
 else:
 
     class BitLinear158CppFunction(torch.autograd.Function):
