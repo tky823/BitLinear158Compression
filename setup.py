@@ -11,18 +11,33 @@ class BuildExtension(_BuildExtension):
     extensions: list[CppExtension | CUDAExtension] = []
 
     if torch.cuda.is_available():
-        extensions.append(
-            CUDAExtension(
-                name="bitlinear158compression._C.bitlinear158",
-                sources=[
-                    "csrc/bitlinear158.cpp",
-                    "csrc/cuda/bitlinear158_cuda.cu",
-                ],
-                extra_compile_args=[
-                    "-DWITH_CUDA",
-                ],
+        if version.parse(torch.__version__) >= version.parse("2.4.0"):
+            extensions.append(
+                CUDAExtension(
+                    name="bitlinear158compression._C.bitlinear158",
+                    sources=[
+                        "csrc/main_torch_2_4.cpp",
+                        "csrc/bitlinear158_torch_2_4.cpp",
+                        "csrc/cuda/bitlinear158_cuda_torch_2_4.cu",
+                    ],
+                    extra_compile_args=[
+                        "-DWITH_CUDA",
+                    ],
+                ),
             )
-        )
+        else:
+            extensions.append(
+                CUDAExtension(
+                    name="bitlinear158compression._C.bitlinear158",
+                    sources=[
+                        "csrc/bitlinear158.cpp",
+                        "csrc/cuda/bitlinear158_cuda.cu",
+                    ],
+                    extra_compile_args=[
+                        "-DWITH_CUDA",
+                    ],
+                )
+            )
     else:
         if version.parse(torch.__version__) >= version.parse("2.4.0"):
             extensions.append(
