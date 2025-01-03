@@ -64,7 +64,6 @@ std::vector<torch::Tensor> bitlinear158_inference_backward(
         TORCH_CHECK(quantized_weight.is_cuda(), "Quantized weight should be on CUDA.");
 #ifdef WITH_CUDA
         return bitlinear158_inference_cuda_backward(input, quantized_weight, grad_output);
-
 #endif
         AT_ERROR("CUDA is not available, but given tensor is on CUDA.");
     }
