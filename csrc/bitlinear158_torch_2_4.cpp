@@ -15,7 +15,9 @@ namespace bitlinear158compression
     std::vector<torch::Tensor> bitlinear158_inference_cpu_backward(const at::Tensor &input, const at::Tensor &quantized_weight, const at::Tensor &grad_output)
     {
         at::Tensor grad_input = torch::matmul(grad_output, quantized_weight);
-        at::Tensor grad_weight = torch::matmul(grad_output.transpose(1, 0), input);
+        at::Tensor reshaped_input = input.view({-1, input.size(-1)});
+        at::Tensor reshaped_grad_output = grad_output.view({-1, grad_output.size(-1)});
+        at::Tensor grad_weight = torch::matmul(reshaped_grad_output.transpose(1, 0), reshaped_input);
 
         return {grad_input, grad_weight};
     }
