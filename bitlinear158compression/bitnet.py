@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from packaging import version
 from torchao.prototype.dtypes.uint2 import pack_uint2, unpack_uint2
 
 from ._C import bitlinear158 as bitlinear158_cpp
@@ -346,32 +347,85 @@ class BitLinear158CppInference(BitLinear158Inference):
         return output
 
 
-class BitLinear158CppFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(
-        ctx, input: torch.Tensor, quantized_weight: torch.Tensor
+if version.parse(torch.__version__) > version.parse("2.4.0"):
+
+    @torch.library.register_fake(
+        "bitlinear158compression::bitlinear158_inference_forward"
+    )
+    def _(
+        input: torch.Tensor,
+        quantized_weight: torch.Tensor,
+    ) -> torch.Tensor:
+        torch._check(input.dim() > 1)
+        torch._check(quantized_weight.dim() == 2)
+        torch._check(input.size(-1) == quantized_weight.size(1))
+        torch._check(input.device == quantized_weight.device)
+
+        *batch_shape, _ = input.size()
+        out_features = quantized_weight.size(0)
+
+        return torch.empty((*batch_shape, out_features), dtype=input.dtype)
+
+    def bitlinear158(
+        input: torch.Tensor,
+        quantized_weight: torch.Tensor,
+        bias: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if quantized_weight.is_cuda:
             quantized_weight = quantized_weight.to(torch.int8)
         else:
             quantized_weight = quantized_weight.to(input.dtype)
 
-        (output,) = bitlinear158_cpp.forward(input, quantized_weight)
-
-        ctx.save_for_backward(input, quantized_weight)
-
-        return output
-
-    @staticmethod
-    def backward(
-        ctx, grad_output: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
-        input, quantized_weight = ctx.saved_tensors
-        grad_input, grad_quantized_weight = bitlinear158_cpp.backward(
-            input, quantized_weight, grad_output
+        (output,) = (
+            torch.ops.bitlinear158compression.bitlinear158_inference_forward.default(
+                input, quantized_weight
+            )
         )
 
-        return grad_input, grad_quantized_weight
+        if bias is not None:
+            output = output + bias
+
+        return output
+else:
+
+    class BitLinear158CppFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(
+            ctx, input: torch.Tensor, quantized_weight: torch.Tensor
+        ) -> torch.Tensor:
+            if quantized_weight.is_cuda:
+                quantized_weight = quantized_weight.to(torch.int8)
+            else:
+                quantized_weight = quantized_weight.to(input.dtype)
+
+            (output,) = bitlinear158_cpp.forward(input, quantized_weight)
+
+            ctx.save_for_backward(input, quantized_weight)
+
+            return output
+
+        @staticmethod
+        def backward(
+            ctx, grad_output: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+            input, quantized_weight = ctx.saved_tensors
+            grad_input, grad_quantized_weight = bitlinear158_cpp.backward(
+                input, quantized_weight, grad_output
+            )
+
+            return grad_input, grad_quantized_weight
+
+    def bitlinear158(
+        input: torch.Tensor,
+        quantized_weight: torch.Tensor,
+        bias: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        output = BitLinear158CppFunction.apply(input, quantized_weight)
+
+        if bias is not None:
+            output = output + bias
+
+        return output
 
 
 def round_clamp(
@@ -418,13 +472,3 @@ def quantize_weight(
     quantized_weight = round_clamp(weight, min=-1, max=1)
 
     return quantized_weight, scale
-
-
-def bitlinear158(
-    input: torch.Tensor,
-    quantized_weight: torch.Tensor,
-    bias: torch.Tensor | None = None,
-) -> torch.Tensor:
-    output = BitLinear158CppFunction.apply(input, quantized_weight) + bias
-
-    return output
