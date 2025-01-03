@@ -10,6 +10,20 @@ from torchao.prototype.dtypes.uint2 import pack_uint2, unpack_uint2
 from ._C import bitlinear158 as bitlinear158_cpp
 
 
+def pack_int8_to_int2(input: torch.CharTensor) -> torch.CharTensor:
+    assert (
+        input.size(-1) % 4 == 0
+    ), "Number of channels in last dimension should be divisible by 4."
+
+    input0 = (input[..., 0::4] & 0b11) << 6
+    input1 = (input[..., 1::4] & 0b11) << 4
+    input2 = (input[..., 2::4] & 0b11) << 2
+    input3 = (input[..., 3::4] & 0b11) << 0
+    output = input0 + input1 + input2 + input3
+
+    return output
+
+
 class BitLinear158(nn.Module):
     def __init__(
         self,
@@ -409,7 +423,7 @@ class BitLinear158CppTraining(BitLinear158Inference):
         return output
 
 
-if version.parse(torch.__version__) > version.parse("2.4.0"):
+if version.parse(torch.__version__) >= version.parse("2.4.0"):
 
     @torch.library.register_fake(
         "bitlinear158compression::bitlinear158_inference_forward"
