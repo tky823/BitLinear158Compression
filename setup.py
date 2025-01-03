@@ -1,6 +1,7 @@
 import os
 
 import torch
+from packaging import version
 from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension as _BuildExtension
 from torch.utils.cpp_extension import CppExtension, CUDAExtension
@@ -20,14 +21,25 @@ class BuildExtension(_BuildExtension):
             )
         )
     else:
-        extensions.append(
-            CppExtension(
-                name="bitlinear158compression._C.bitlinear158",
-                sources=[
-                    "csrc/bitlinear158.cpp",
-                ],
+        if version.parse(torch.__version__) > version.parse("2.4.0"):
+            extensions.append(
+                CppExtension(
+                    name="bitlinear158compression._C.bitlinear158",
+                    sources=[
+                        "csrc/main_torch_2_4.cpp",
+                        "csrc/bitlinear158_torch_2_4.cpp",
+                    ],
+                ),
             )
-        )
+        else:
+            extensions.append(
+                CppExtension(
+                    name="bitlinear158compression._C.bitlinear158",
+                    sources=[
+                        "csrc/bitlinear158.cpp",
+                    ],
+                )
+            )
 
     def run(self) -> None:
         if self.editable_mode:
