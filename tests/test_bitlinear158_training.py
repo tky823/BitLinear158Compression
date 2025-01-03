@@ -38,6 +38,7 @@ def main() -> None:
         input = torch.randn((batch_size, in_features))
         target = torch.randn((batch_size, out_features))
         input = input.to(device)
+        target = target.to(device)
 
         start = time.perf_counter()
         training_output = training_model(input)
