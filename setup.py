@@ -18,10 +18,13 @@ class BuildExtension(_BuildExtension):
                     "csrc/bitlinear158.cpp",
                     "csrc/cuda/bitlinear158_cuda.cu",
                 ],
+                extra_compile_args=[
+                    "-DWITH_CUDA",
+                ],
             )
         )
     else:
-        if version.parse(torch.__version__) > version.parse("2.4.0"):
+        if version.parse(torch.__version__) >= version.parse("2.4.0"):
             extensions.append(
                 CppExtension(
                     name="bitlinear158compression._C.bitlinear158",
