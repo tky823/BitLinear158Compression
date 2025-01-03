@@ -5,7 +5,8 @@
 
 namespace bitlinear158compression
 {
-    std::vector<at::Tensor> bitlinear158_inference_cpu_forward(const at::Tensor &input, const at::Tensor &quantized_weight);
+    at::Tensor bitlinear158_inference_cpu_forward(const at::Tensor &input, const at::Tensor &quantized_weight);
+    std::vector<at::Tensor> bitlinear158_inference_cpu_backward(const at::Tensor &input, const at::Tensor &quantized_weight, const at::Tensor &grad_output);
 }
 
 #endif // BITLINEAR158COMPRESSION_H
